@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1d3a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Tirage cadeaux">
+  <title>Tirage des cadeaux</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>">
+  <style>
+    :root {
+      --night-1: #0b1d3a;
+      --night-2: #14315e;
+      --red: #c8102e;
+      --red-dark: #9b0c23;
+      --green: #1a7f4b;
+      --green-dark: #136239;
+      --gold: #f5c542;
+      --card: #fffaf3;
+      --ink: #2a1a12;
+      --muted: #7a6a60;
+      --chip: #fde8e8;
+      --border: #ecd9c6;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: radial-gradient(ellipse at top, var(--night-2), var(--night-1) 70%) fixed;
+      background-color: var(--night-1);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Neige */
+    #snow { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .flake {
+      position: absolute; top: -2em; color: #fff; opacity: .8;
+      animation: fall linear infinite;
+      user-select: none;
+    }
+    @keyframes fall {
+      to { transform: translate(var(--drift, 20px), 110vh) rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) { .flake { display: none; } }
+
+    main {
+      position: relative; z-index: 1;
+      max-width: 480px; margin: 0 auto;
+      padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    }
+    header { text-align: center; color: #fff; padding: 12px 0 8px; }
+    .garland { font-size: 1.4rem; letter-spacing: .2em; }
+    h1 {
+      margin: 8px 0 4px; font-size: 1.9rem; line-height: 1.15;
+      color: #fff; text-shadow: 0 2px 0 var(--red-dark), 0 0 18px rgba(245,197,66,.45);
+    }
+    .subtitle { margin: 0; color: #d6e2f5; font-size: .95rem; }
+
+    .card {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 18px 16px;
+      margin-top: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      border-top: 6px solid var(--red);
+      position: relative;
+    }
+    .card.green { border-top-color: var(--green); }
+    .card h2 { margin: 0 0 12px; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; }
+    .count { margin-left: auto; font-size: .85rem; font-weight: 600; color: var(--muted); }
+
+    .add-row { display: flex; gap: 8px; }
+    input[type=text] {
+      flex: 1; min-width: 0;
+      font-size: 16px; /* évite le zoom iOS */
+      padding: 12px 14px; min-height: 48px;
+      border: 2px solid var(--border); border-radius: 12px;
+      background: #fff; color: var(--ink);
+    }
+    input[type=text]:focus { outline: none; border-color: var(--green); }
+
+    button {
+      font: inherit; font-weight: 700; cursor: pointer;
+      border: 0; border-radius: 12px; min-height: 48px; padding: 0 16px;
+      transition: transform .08s, background .2s, opacity .2s;
+    }
+    button:active { transform: scale(.97); }
+    button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-green:not(:disabled):hover { background: var(--green-dark); }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-red:not(:disabled):hover { background: var(--red-dark); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 2px solid var(--border); }
+    .btn-big { width: 100%; font-size: 1.15rem; min-height: 56px; margin-top: 16px;
+      box-shadow: 0 4px 0 var(--red-dark); }
+    .btn-big:not(:disabled):active { box-shadow: 0 1px 0 var(--red-dark); transform: translateY(3px); }
+
+    .msg { min-height: 1.3em; margin: 8px 2px 0; font-size: .88rem; color: var(--red); }
+
+    .chips { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+    .chips li {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--chip); border: 1px solid #f5c6c6;
+      border-radius: 999px; padding: 4px 4px 4px 12px; font-weight: 600;
+      max-width: 100%; animation: pop .25s ease-out;
+    }
+    .chips li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chips li button {
+      min-height: 32px; width: 32px; padding: 0; border-radius: 50%;
+      background: transparent; color: var(--red); font-size: 1rem; flex: none;
+    }
+    .empty { color: var(--muted); font-size: .9rem; margin: 12px 0 0; text-align: center; }
+
+    .row-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .row-actions > * { flex: 1; }
+    label.toggle { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: .92rem; cursor: pointer; }
+    label.toggle input { width: 22px; height: 22px; accent-color: var(--green); }
+
+    .results { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+    .results li {
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+      background: #fff; border: 2px solid var(--border); border-radius: 14px;
+      padding: 12px; opacity: 0; transform: translateY(10px);
+      animation: appear .4s ease-out forwards;
+    }
+    .results .who { font-weight: 700; overflow-wrap: anywhere; }
+    .results .to { text-align: right; }
+    .results .arrow { font-size: 1.2rem; }
+    .results li.secret { cursor: pointer; }
+    .results li.secret .to .name { display: none; }
+    .results li.secret .to::after { content: "Touchez pour voir 👀"; font-weight: 500; color: var(--muted); font-size: .85rem; }
+    .results li.secret.revealed .to .name { display: inline; }
+    .results li.secret.revealed .to::after { content: none; }
+    .results li.secret.revealed { border-color: var(--gold); }
+
+    .results li.secret { grid-template-columns: 1fr auto 1fr auto; }
+    .share-one {
+      min-height: 40px; width: 40px; padding: 0; border-radius: 50%;
+      background: #e8f5ee; color: var(--green); font-size: 1.1rem;
+    }
+    .btn-share { width: 100%; margin-top: 14px; font-size: 1.05rem; }
+    .hint { margin: 10px 2px 0; font-size: .85rem; color: var(--muted); }
+    .fallback { margin-top: 12px; }
+    .share-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+    .share-links a {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 48px; border-radius: 12px; font-weight: 700; text-decoration: none; color: #fff;
+    }
+    .share-links .wa { background: #1fa855; }
+    .share-links .sms { background: #2d6cdf; }
+    .share-links .mail { background: var(--red); }
+    .toast {
+      position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+      transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+      background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 999px;
+      font-weight: 600; font-size: .92rem; z-index: 5; max-width: calc(100% - 32px); text-align: center;
+      transition: opacity .25s, transform .25s;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    .hidden { display: none !important; }
+    footer { text-align: center; color: #9fb3d6; font-size: .8rem; margin-top: 20px; }
+
+    @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes appear { to { opacity: 1; transform: none; } }
+    @keyframes shake {
+      0%,100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); }
+    }
+    .shaking { display: inline-block; animation: shake .3s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div id="snow" aria-hidden="true"></div>
+
+  <main>
+    <header>
+      <div class="garland" aria-hidden="true">🎄✨🎁✨🔔✨🎄</div>
+      <h1>Tirage au sort<br>des cadeaux</h1>
+      <p class="subtitle">Chacun offre un cadeau… et en reçoit un !</p>
+    </header>
+
+    <!-- Saisie des participants -->
+    <section class="card" id="setup">
+      <h2>🎅 Participants <span class="count" id="count">0</span></h2>
+      <form class="add-row" id="addForm" autocomplete="off">
+        <input type="text" id="nameInput" placeholder="Prénom" maxlength="40"
+               enterkeyhint="done" autocapitalize="words" aria-label="Prénom du participant">
+        <button type="submit" class="btn-green">Ajouter</button>
+      </form>
+      <p class="msg" id="msg" role="status"></p>
+      <ul class="chips" id="chips"></ul>
+      <p class="empty" id="empty">Ajoutez au moins 2 personnes ⛄</p>
+
+      <label class="toggle">
+        <input type="checkbox" id="secretToggle">
+        Mode secret : masquer les résultats (on se passe le téléphone)
+      </label>
+
+      <button class="btn-red btn-big" id="drawBtn" disabled>🎁 Lancer le tirage</button>
+      <div class="row-actions">
+        <button class="btn-ghost" id="clearBtn">Tout effacer</button>
+      </div>
+    </section>
+
+    <!-- Résultats -->
+    <section class="card green hidden" id="resultCard" aria-live="polite">
+      <h2>🎉 Résultat du tirage</h2>
+      <ul class="results" id="results"></ul>
+      <button class="btn-green btn-share" id="shareBtn">📤 Partager le résultat</button>
+      <p class="hint hidden" id="secretHint">Mode secret : touchez 📤 sur une ligne pour envoyer à chacun uniquement son tirage.</p>
+      <div class="fallback hidden" id="fallback">
+        <p class="hint" id="fallbackWhy">Envoyer avec :</p>
+        <div class="share-links">
+          <a class="wa" id="waLink" href="#" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="sms" id="smsLink" href="#">SMS</a>
+          <a class="mail" id="mailLink" href="#">Email</a>
+        </div>
+      </div>
+      <div class="row-actions">
+        <button class="btn-red" id="redrawBtn">🔄 Refaire</button>
+        <button class="btn-ghost" id="editBtn">✏️ Modifier</button>
+      </div>
+    </section>
+
+    <footer>Joyeux Noël ! 🎄</footer>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    var STORAGE_KEY = "tirage-cadeaux-noms";
+    var names = loadNames();
+
+    var $ = function (id) { return document.getElementById(id); };
+    var input = $("nameInput"), chips = $("chips"), msg = $("msg"), count = $("count");
+    var empty = $("empty"), drawBtn = $("drawBtn"), setup = $("setup");
+    var resultCard = $("resultCard"), results = $("results"), secretToggle = $("secretToggle");
+
+    // ---------- Stockage local (facultatif) ----------
+    function loadNames() {
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        var arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr.filter(function (n) { return typeof n === "string" && n.trim(); }) : [];
+      } catch (e) { return []; }
+    }
+    function saveNames() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(names)); } catch (e) {}
+    }
+
+    // ---------- Aléatoire ----------
+    function randomInt(max) { // entier dans [0, max)
+      if (window.crypto && crypto.getRandomValues) {
+        var buf = new Uint32Array(1), limit = Math.floor(0x100000000 / max) * max;
+        do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+        return buf[0] % max;
+      }
+      return Math.floor(Math.random() * max);
+    }
+    function shuffle(list) { // Fisher-Yates
+      var a = list.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = randomInt(i + 1), t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    }
+
+    // Tirage : on mélange, puis chacun offre au suivant, le dernier au premier.
+    // => un seul grand cycle : personne ne s'offre à soi-même, chacun offre et reçoit 1 cadeau.
+    function draw(list) {
+      var order = shuffle(list);
+      return order.map(function (giver, i) {
+        return { from: giver, to: order[(i + 1) % order.length] };
+      });
+    }
+    window.tirage = draw; // exposé pour les tests
+
+    // ---------- Affichage ----------
+    function renderNames() {
+      chips.innerHTML = "";
+      names.forEach(function (name, i) {
+        var li = document.createElement("li");
+        var span = document.createElement("span");
+        span.textContent = name;
+        var del = document.createElement("button");
+        del.type = "button";
+        del.textContent = "✕";
+        del.setAttribute("aria-label", "Retirer " + name);
+        del.addEventListener("click", function () {
+          names.splice(i, 1); saveNames(); renderNames();
+        });
+        li.appendChild(span); li.appendChild(del);
+        chips.appendChild(li);
+      });
+      count.textContent = names.length + (names.length > 1 ? " personnes" : " personne");
+      empty.classList.toggle("hidden", names.length > 0);
+      drawBtn.disabled = names.length < 2;
+    }
+
+    function setMsg(text) { msg.textContent = text || ""; }
+
+    function addName(raw) {
+      var name = raw.replace(/\s+/g, " ").trim();
+      if (!name) { setMsg("Entrez un prénom."); return; }
+      var exists = names.some(function (n) { return n.toLowerCase() === name.toLowerCase(); });
+      if (exists) { setMsg("« " + name + " » est déjà dans la liste."); return; }
+      names.push(name); saveNames(); renderNames(); setMsg("");
+    }
+
+    // ---------- Partage (Android / iOS via la feuille de partage native) ----------
+    var SHARE_TITLE = "Tirage au sort des cadeaux";
+    var lastPairs = [];
+    var toast = $("toast"), toastTimer = null;
+    var fallback = $("fallback");
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 2500);
+    }
+
+    // Si la feuille de partage native n'est pas disponible : liens directs WhatsApp / SMS / Email
+    function showShareLinks(text, why) {
+      var body = encodeURIComponent(text);
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      $("waLink").href = "https://wa.me/?text=" + body;
+      $("smsLink").href = (isIOS ? "sms:&body=" : "sms:?body=") + body;
+      $("mailLink").href = "mailto:?subject=" + encodeURIComponent(SHARE_TITLE) + "&body=" + body;
+      $("fallbackWhy").textContent = why;
+      fallback.classList.remove("hidden");
+      fallback.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    // Web Share API : ouvre la feuille de partage d'Android / iOS
+    // (nécessite une page en HTTPS et un clic de l'utilisateur)
+    function shareText(text) {
+      fallback.classList.add("hidden");
+      var data = { title: SHARE_TITLE, text: text };
+      if (location.protocol === "https:") data.url = location.href;
+
+      if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
+        navigator.share(data)
+          .then(function () { showToast("Partagé ! 🎉"); })
+          .catch(function (err) {
+            if (err && err.name === "AbortError") return; // partage annulé par l'utilisateur
+            showShareLinks(text, "Le partage n'a pas pu s'ouvrir. Envoyer avec :");
+          });
+      } else {
+        showShareLinks(text, "Le partage du téléphone n'est pas disponible ici (ouvrez la page dans Safari ou Chrome). Envoyer avec :");
+      }
+    }
+
+    function fullResultText(pairs) {
+      return "🎄 Tirage au sort des cadeaux 🎁\n\n" +
+        pairs.map(function (p) { return "🎅 " + p.from + " ➜ 🎁 " + p.to; }).join("\n") +
+        "\n\nJoyeux Noël !";
+    }
+
+    function oneResultText(p) {
+      return "🎄 Tirage au sort des cadeaux\n\n" + p.from + ", tu offres un cadeau à : " + p.to + " 🎁\n\nChut, c'est secret ! 🤫";
+    }
+
+    $("shareBtn").addEventListener("click", function () { shareText(fullResultText(lastPairs)); });
+
+    function showResults() {
+      var pairs = draw(names);
+      var secret = secretToggle.checked;
+      lastPairs = pairs;
+      results.innerHTML = "";
+      fallback.classList.add("hidden");
+      $("shareBtn").classList.toggle("hidden", secret);
+      $("secretHint").classList.toggle("hidden", !secret);
+      pairs.forEach(function (p, i) {
+        var li = document.createElement("li");
+        li.style.animationDelay = (i * 0.12) + "s";
+        if (secret) {
+          li.classList.add("secret");
+          li.setAttribute("role", "button");
+          li.setAttribute("tabindex", "0");
+          li.addEventListener("click", function () { li.classList.toggle("revealed"); });
+          li.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); li.classList.toggle("revealed"); }
+          });
+        }
+        var from = document.createElement("span");
+        from.className = "who";
+        from.textContent = "🎅 " + p.from;
+        var arrow = document.createElement("span");
+        arrow.className = "arrow"; arrow.textContent = "➜";
+        arrow.setAttribute("aria-label", "offre à");
+        var to = document.createElement("span");
+        to.className = "who to";
+        var toName = document.createElement("span");
+        toName.className = "name";
+        toName.textContent = "🎁 " + p.to;
+        to.appendChild(toName);
+        li.appendChild(from); li.appendChild(arrow); li.appendChild(to);
+        if (secret) {
+          var one = document.createElement("button");
+          one.type = "button";
+          one.className = "share-one";
+          one.textContent = "📤";
+          one.setAttribute("aria-label", "Envoyer son tirage à " + p.from);
+          one.addEventListener("click", function (e) {
+            e.stopPropagation();
+            shareText(oneResultText(p));
+          });
+          li.appendChild(one);
+        }
+        results.appendChild(li);
+      });
+      setup.classList.add("hidden");
+      resultCard.classList.remove("hidden");
+      resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function launch(btn) {
+      if (names.length < 2) return;
+      var label = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="shaking">🎁</span> Tirage en cours…';
+      setTimeout(function () {
+        btn.disabled = false; btn.innerHTML = label;
+        showResults();
+      }, 900);
+    }
+
+    // ---------- Événements ----------
+    $("addForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      addName(input.value);
+      input.value = "";
+      input.focus();
+    });
+    input.addEventListener("input", function () { setMsg(""); });
+    drawBtn.addEventListener("click", function () { launch(drawBtn); });
+    $("redrawBtn").addEventListener("click", function () { launch($("redrawBtn")); });
+    $("editBtn").addEventListener("click", function () {
+      resultCard.classList.add("hidden");
+      setup.classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    // Effacement en deux appuis (pas de confirm(), bloqué dans certains navigateurs intégrés)
+    var clearBtn = $("clearBtn"), clearTimer = null;
+    clearBtn.addEventListener("click", function () {
+      if (!names.length) return;
+      if (!clearTimer) {
+        clearBtn.textContent = "Appuyez encore pour confirmer";
+        clearTimer = setTimeout(resetClear, 3000);
+        return;
+      }
+      resetClear();
+      names = []; saveNames(); renderNames(); setMsg("");
+    });
+    function resetClear() {
+      clearTimeout(clearTimer); clearTimer = null;
+      clearBtn.textContent = "Tout effacer";
+    }
+
+    // ---------- Neige ----------
+    (function snow() {
+      var box = $("snow"), n = window.innerWidth < 500 ? 28 : 50;
+      var glyphs = ["❄", "❅", "❆", "•"];
+      for (var i = 0; i < n; i++) {
+        var f = document.createElement("span");
+        f.className = "flake";
+        f.textContent = glyphs[i % glyphs.length];
+        f.style.left = (Math.random() * 100) + "vw";
+        f.style.fontSize = (8 + Math.random() * 16) + "px";
+        f.style.opacity = (0.4 + Math.random() * 0.6).toFixed(2);
+        f.style.animationDuration = (7 + Math.random() * 10) + "s";
+        f.style.animationDelay = (-Math.random() * 15) + "s";
+        f.style.setProperty("--drift", (Math.random() * 80 - 40) + "px");
+        box.appendChild(f);
+      }
+    })();
+
+    renderNames();
+  })();
+  </script>
+</body>
+</html>
