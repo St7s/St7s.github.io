@@ -138,6 +138,28 @@
     .results li.secret.revealed .to::after { content: none; }
     .results li.secret.revealed { border-color: var(--gold); }
 
+    .results li.secret { grid-template-columns: 1fr auto 1fr auto; }
+    .share-one {
+      min-height: 40px; width: 40px; padding: 0; border-radius: 50%;
+      background: #e8f5ee; color: var(--green); font-size: 1.1rem;
+    }
+    .btn-share { width: 100%; margin-top: 14px; font-size: 1.05rem; }
+    .hint { margin: 10px 2px 0; font-size: .85rem; color: var(--muted); }
+    .fallback { margin-top: 12px; }
+    .fallback textarea {
+      width: 100%; min-height: 140px; font: inherit; font-size: 15px;
+      border: 2px solid var(--border); border-radius: 12px; padding: 10px; resize: vertical;
+      background: #fff; color: var(--ink);
+    }
+    .toast {
+      position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+      transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+      background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 999px;
+      font-weight: 600; font-size: .92rem; z-index: 5; max-width: calc(100% - 32px); text-align: center;
+      transition: opacity .25s, transform .25s;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
     .hidden { display: none !important; }
     footer { text-align: center; color: #9fb3d6; font-size: .8rem; margin-top: 20px; }
 
@@ -186,6 +208,12 @@
     <section class="card green hidden" id="resultCard" aria-live="polite">
       <h2>🎉 Résultat du tirage</h2>
       <ul class="results" id="results"></ul>
+      <button class="btn-green btn-share" id="shareBtn">📤 Partager le résultat</button>
+      <p class="hint hidden" id="secretHint">Mode secret : touchez 📤 sur une ligne pour envoyer à chacun uniquement son tirage.</p>
+      <div class="fallback hidden" id="fallback">
+        <p class="hint">Copiez ce texte et collez-le dans votre messagerie :</p>
+        <textarea id="fallbackText" readonly aria-label="Texte à partager"></textarea>
+      </div>
       <div class="row-actions">
         <button class="btn-red" id="redrawBtn">🔄 Refaire</button>
         <button class="btn-ghost" id="editBtn">✏️ Modifier</button>
@@ -194,6 +222,7 @@
 
     <footer>Joyeux Noël ! 🎄</footer>
   </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
   (function () {
@@ -278,10 +307,68 @@
       names.push(name); saveNames(); renderNames(); setMsg("");
     }
 
+    // ---------- Partage (Android / iOS via la feuille de partage native) ----------
+    var SHARE_TITLE = "Tirage au sort des cadeaux";
+    var lastPairs = [];
+    var toast = $("toast"), toastTimer = null;
+    var fallback = $("fallback"), fallbackText = $("fallbackText");
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 2500);
+    }
+
+    function showFallback(text) {
+      fallbackText.value = text;
+      fallback.classList.remove("hidden");
+      fallbackText.focus();
+      fallbackText.select();
+    }
+
+    function copyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          showToast("Résultat copié, collez-le dans votre messagerie 📋");
+        }, function () { showFallback(text); });
+      } else {
+        showFallback(text);
+      }
+    }
+
+    function shareText(text) {
+      fallback.classList.add("hidden");
+      if (navigator.share) {
+        navigator.share({ title: SHARE_TITLE, text: text }).catch(function (err) {
+          if (err && err.name === "AbortError") return; // partage annulé par l'utilisateur
+          copyText(text);
+        });
+      } else {
+        copyText(text);
+      }
+    }
+
+    function fullResultText(pairs) {
+      return "🎄 Tirage au sort des cadeaux 🎁\n\n" +
+        pairs.map(function (p) { return "🎅 " + p.from + " ➜ 🎁 " + p.to; }).join("\n") +
+        "\n\nJoyeux Noël !";
+    }
+
+    function oneResultText(p) {
+      return "🎄 Tirage au sort des cadeaux\n\n" + p.from + ", tu offres un cadeau à : " + p.to + " 🎁\n\nChut, c'est secret ! 🤫";
+    }
+
+    $("shareBtn").addEventListener("click", function () { shareText(fullResultText(lastPairs)); });
+
     function showResults() {
       var pairs = draw(names);
       var secret = secretToggle.checked;
+      lastPairs = pairs;
       results.innerHTML = "";
+      fallback.classList.add("hidden");
+      $("shareBtn").classList.toggle("hidden", secret);
+      $("secretHint").classList.toggle("hidden", !secret);
       pairs.forEach(function (p, i) {
         var li = document.createElement("li");
         li.style.animationDelay = (i * 0.12) + "s";
@@ -307,6 +394,18 @@
         toName.textContent = "🎁 " + p.to;
         to.appendChild(toName);
         li.appendChild(from); li.appendChild(arrow); li.appendChild(to);
+        if (secret) {
+          var one = document.createElement("button");
+          one.type = "button";
+          one.className = "share-one";
+          one.textContent = "📤";
+          one.setAttribute("aria-label", "Envoyer son tirage à " + p.from);
+          one.addEventListener("click", function (e) {
+            e.stopPropagation();
+            shareText(oneResultText(p));
+          });
+          li.appendChild(one);
+        }
         results.appendChild(li);
       });
       setup.classList.add("hidden");
