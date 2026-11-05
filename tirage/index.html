@@ -146,14 +146,11 @@
     .btn-share { width: 100%; margin-top: 14px; font-size: 1.05rem; }
     .hint { margin: 10px 2px 0; font-size: .85rem; color: var(--muted); }
     .fallback { margin-top: 12px; }
-    .share-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
-    .share-links a {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      min-height: 48px; border-radius: 12px; font-weight: 700; text-decoration: none; color: #fff;
+    .fallback textarea {
+      width: 100%; min-height: 140px; font: inherit; font-size: 15px;
+      border: 2px solid var(--border); border-radius: 12px; padding: 10px; resize: vertical;
+      background: #fff; color: var(--ink);
     }
-    .share-links .wa { background: #1fa855; }
-    .share-links .sms { background: #2d6cdf; }
-    .share-links .mail { background: var(--red); }
     .toast {
       position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
       transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
@@ -211,15 +208,11 @@
     <section class="card green hidden" id="resultCard" aria-live="polite">
       <h2>🎉 Résultat du tirage</h2>
       <ul class="results" id="results"></ul>
-      <button class="btn-green btn-share" id="shareBtn">📤 Partager le résultat</button>
-      <p class="hint hidden" id="secretHint">Mode secret : touchez 📤 sur une ligne pour envoyer à chacun uniquement son tirage.</p>
+      <button class="btn-green btn-share" id="shareBtn">📋 Copier le résultat</button>
+      <p class="hint hidden" id="secretHint">Mode secret : touchez 📋 sur une ligne pour copier uniquement le tirage de cette personne.</p>
       <div class="fallback hidden" id="fallback">
-        <p class="hint" id="fallbackWhy">Envoyer avec :</p>
-        <div class="share-links">
-          <a class="wa" id="waLink" href="#" target="_blank" rel="noopener">WhatsApp</a>
-          <a class="sms" id="smsLink" href="#">SMS</a>
-          <a class="mail" id="mailLink" href="#">Email</a>
-        </div>
+        <p class="hint">Copiez ce texte et collez-le dans votre messagerie :</p>
+        <textarea id="fallbackText" readonly aria-label="Texte à partager"></textarea>
       </div>
       <div class="row-actions">
         <button class="btn-red" id="redrawBtn">🔄 Refaire</button>
@@ -318,7 +311,7 @@
     var SHARE_TITLE = "Tirage au sort des cadeaux";
     var lastPairs = [];
     var toast = $("toast"), toastTimer = null;
-    var fallback = $("fallback");
+    var fallback = $("fallback"), fallbackText = $("fallbackText");
 
     function showToast(text) {
       toast.textContent = text;
@@ -327,35 +320,41 @@
       toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 2500);
     }
 
-    // Si la feuille de partage native n'est pas disponible : liens directs WhatsApp / SMS / Email
-    function showShareLinks(text, why) {
-      var body = encodeURIComponent(text);
-      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      $("waLink").href = "https://wa.me/?text=" + body;
-      $("smsLink").href = (isIOS ? "sms:&body=" : "sms:?body=") + body;
-      $("mailLink").href = "mailto:?subject=" + encodeURIComponent(SHARE_TITLE) + "&body=" + body;
-      $("fallbackWhy").textContent = why;
+    function showFallback(text) {
+      fallbackText.value = text;
       fallback.classList.remove("hidden");
-      fallback.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      fallbackText.focus();
+      fallbackText.select();
     }
 
-    // Web Share API : ouvre la feuille de partage d'Android / iOS
-    // (nécessite une page en HTTPS et un clic de l'utilisateur)
+    // Ancienne méthode de copie (navigateurs sans navigator.clipboard)
+    function legacyCopy(text) {
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select(); ta.setSelectionRange(0, text.length);
+        var ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) { return false; }
+    }
+
+    function copied() { showToast("Résultat copié, collez-le dans votre messagerie 📋"); }
+
+    // Partage par copier-coller : on copie le texte, l'utilisateur le colle où il veut
     function shareText(text) {
       fallback.classList.add("hidden");
-      var data = { title: SHARE_TITLE, text: text };
-      if (location.protocol === "https:") data.url = location.href;
-
-      if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
-        navigator.share(data)
-          .then(function () { showToast("Partagé ! 🎉"); })
-          .catch(function (err) {
-            if (err && err.name === "AbortError") return; // partage annulé par l'utilisateur
-            showShareLinks(text, "Le partage n'a pas pu s'ouvrir. Envoyer avec :");
-          });
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(copied, function () {
+          if (legacyCopy(text)) copied(); else showFallback(text);
+        });
+      } else if (legacyCopy(text)) {
+        copied();
       } else {
-        showShareLinks(text, "Le partage du téléphone n'est pas disponible ici (ouvrez la page dans Safari ou Chrome). Envoyer avec :");
+        showFallback(text);
       }
     }
 
@@ -408,8 +407,8 @@
           var one = document.createElement("button");
           one.type = "button";
           one.className = "share-one";
-          one.textContent = "📤";
-          one.setAttribute("aria-label", "Envoyer son tirage à " + p.from);
+          one.textContent = "📋";
+          one.setAttribute("aria-label", "Copier le tirage de " + p.from);
           one.addEventListener("click", function (e) {
             e.stopPropagation();
             shareText(oneResultText(p));
